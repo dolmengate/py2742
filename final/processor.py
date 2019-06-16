@@ -1,6 +1,21 @@
+import time
 import esper
-import component
+from component import *
 import pygame
+import itertools
+
+
+class CollisionProcessor(esper.Processor):
+    def __init__(self):
+        pass
+
+    def process(self):
+        # Sprite Groups instead?
+        for a, b in itertools.product(self.world.get_components(Renderable), repeat=2):
+            s1 = a[1][0]
+            s2 = b[1][0]
+            if s1 != s2 and pygame.sprite.collide_rect(s1, s2):
+                print(f'{time.time()} collision between {s1} and {s2}')
 
 
 class MovementProcessor(esper.Processor):
@@ -12,16 +27,15 @@ class MovementProcessor(esper.Processor):
         self.maxy = maxy
 
     def process(self):
-        # This will iterate over every Entity that has BOTH of these components:
-        for ent, (vel, rend) in self.world.get_components(component.Velocity, component.Renderable):
-            rend.x += vel.x
-            rend.y += vel.y
+        for ent, (vel, rend) in self.world.get_components(Velocity, Renderable):
+            rend.rect.x += vel.x
+            rend.rect.y += vel.y
 
             # disallow movement outside the boundaries of the screen
-            rend.x = max(self.minx, rend.x)
-            rend.y = max(self.miny, rend.y)
-            rend.x = min(self.maxx - rend.w, rend.x)
-            rend.y = min(self.maxy - rend.h, rend.y)
+            rend.rect.x = max(self.minx, rend.rect.x)
+            rend.rect.y = max(self.miny, rend.rect.y)
+            rend.rect.x = min(self.maxx - rend.w, rend.rect.x)
+            rend.rect.y = min(self.maxy - rend.h, rend.rect.y)
 
 
 class RenderProcessor(esper.Processor):
@@ -34,7 +48,7 @@ class RenderProcessor(esper.Processor):
         # Clear the window:
         self.window.fill(self.clear_color)
         # This will iterate over every Entity that has this Component, and blit it:
-        for ent, rend in self.world.get_component(component.Renderable):
-            self.window.blit(rend.image, (rend.x, rend.y))
+        for ent, rend in self.world.get_component(Renderable):
+            self.window.blit(rend.image, (rend.rect.x, rend.rect.y))
         # Flip the framebuffers
         pygame.display.flip()
