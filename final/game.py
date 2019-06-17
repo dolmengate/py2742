@@ -1,16 +1,17 @@
-import time
 import multiprocessing
 import random
 from processor import *
 
 
 class Game:
-    def __init__(self, enemies_per_sec=2, fps=60, res=(720, 480)):
+    def __init__(self, enemies_per_sec=2, max_enemies=5, fps=60, res=(720, 480)):
         self.eps = enemies_per_sec
         self.fps = fps
         self.res = res
         self.world = esper.World()
         self.window = pygame.display.set_mode(self.res)
+        self._enemy_spawn_proc = None
+        self.max_enemies = max_enemies
 
     def _add_player(self) -> int:
         player = self.world.create_entity()
@@ -18,34 +19,55 @@ class Game:
         self.world.add_component(player, Renderable("redsquare.png", posx=100, posy=100))
         return player
 
-    def _add_enemy(self, x: int = 400, y: int = 250) -> None:
+    def _add_enemy(self, x: int, y: int, velx: int, vely: int, scale=None) -> None:
         enemy = self.world.create_entity()
-        self.world.add_component(enemy, Velocity(x=0, y=0))
-        self.world.add_component(enemy, Renderable("bluesquare.png", posx=x, posy=y))
+        self.world.add_component(enemy, Velocity(x=velx, y=vely))
+        self.world.add_component(enemy, Renderable("bluesquare.png", posx=x, posy=y, scale=scale))
 
     def _load_processors(self):
-        render_processor = RenderProcessor(window=self.window)
-        movement_processor = MovementProcessor(minx=0, maxx=self.res[0], miny=0, maxy=self.res[1])
-        collision_processor = CollisionProcessor()
-        self.world.add_processor(render_processor)
-        self.world.add_processor(movement_processor)
-        self.world.add_processor(collision_processor)
+        self.world.add_processor(RenderProcessor(window=self.window))
+        self.world.add_processor(MovementProcessor(minx=0, maxx=self.res[0], miny=0, maxy=self.res[1]))
+        self.world.add_processor(CollisionProcessor())
 
-    def _enemy_spawn(self, enable=True):
-        if enable:
-            into, outof = multiprocessing.Pipe()
+    def _init_enemy_spawn(self):
+        """
+        Initialize enemy spawning process
+        :return: multiprocess.Pipe that integers representing enemy Entities can be .recv()'d
+            from and settings .send()'t to
+        """
+        # todo enemy locations based on player location
+        # todo spawn frequency based on enemies on map
+        # todo velocity based on Difficulty
 
-            def enemies_over_time(pipe_conn, sec: int) -> None:
-                while True:
-                    x = random.randint(0, self.res[0])
-                    y = random.randint(0, self.res[1])
-                    time.sleep(sec)
-                    print(f'new enemy location {x},{y}')
-                    pipe_conn.send((x, y))
+        into, outof = multiprocessing.Pipe()
 
-            multiprocessing.Process(target=enemies_over_time, args=(into, 2), daemon=True).start()
+        def enemies_over_time(game_conn) -> None:
+            settings = {
+                "vel_max": 3,
+                "sleep": 2,
+                "scale_min": 1.0,
+                "scale_max": 1.0,
+            }
+            while True:
+                posx = random.randint(0, self.res[0])
+                posy = random.randint(0, self.res[1])
+                vel_max = settings["vel_max"]
+                velx = random.randint(-vel_max, vel_max)
+                vely = random.randint(-vel_max, vel_max)
+                time.sleep(settings["sleep"])
+                scale = random.uniform(settings["scale_min"], settings["scale_max"])
 
-            return outof
+                game_conn.send((posx, posy, velx, vely, scale))
+
+                print(f'generated enemy with attributes\nvel: {velx},{vely}\nscale:{scale}')
+
+                if game_conn.poll():
+                    settings.update(game_conn.recv())
+
+        self._enemy_spawn_proc = multiprocessing.Process(target=enemies_over_time, args=(into,), daemon=True)
+        self._enemy_spawn_proc.start()
+
+        return outof
 
     def start(self):
         pygame.init()
@@ -54,10 +76,9 @@ class Game:
         pygame.key.set_repeat(1, 1)
 
         player = self._add_player()
-        self._add_enemy()
         self._load_processors()
 
-        # out_conn = self._enemy_spawn()
+        enemy_conn = self._init_enemy_spawn()
 
         running = True
         while running:
@@ -83,7 +104,16 @@ class Game:
 
             self.world.process()
             clock.tick(self.fps)
-            # if out_conn.poll():
-            #     self._add_enemy(*out_conn.recv())
+            if enemy_conn.poll():
+                if not len(self.world._entities) >= self.max_enemies:
+                    self._add_enemy(*enemy_conn.recv())
+
+                    # conditional enemy spawning based on game state
+                    if len(self.world._entities) >= 2:
+                        enemy_conn.send({"scale_min": 0.5, "scale_max": 0.5, "sleep": 1, "vel_max": 1})
+
+
+
+
 
 # todo fix enemy spawn process not exiting on game exit with Escape
