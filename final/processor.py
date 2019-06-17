@@ -38,6 +38,7 @@ class MovementProcessor(esper.Processor):
             rend.rect.x = min(self.maxx - rend.w, rend.rect.x)
             rend.rect.y = min(self.maxy - rend.h, rend.rect.y)
 
+            # enemy-specific movement logic
             if ent != 1:
                 # bounce enemies off of the screen boundaries
                 if rend.rect.left == self.minx or rend.rect.right == self.maxx:

@@ -4,6 +4,73 @@ from processor import *
 from os.path import join
 
 
+class EnemySpawn:
+    def __init__(self, resx, resy):
+        # todo enemy locations based on player location
+        # todo spawn frequency based on enemies on map
+        # todo velocity based on Difficulty
+
+        self._settings = {
+            "res_x": resx,
+            "res_y": resy,
+            "vel_max": 3,
+            "sleep": 2,
+            "scale_min": 1.0,
+            "scale_max": 1.0,
+            "enabled": True,
+        }
+        self._game, self._enemies = multiprocessing.Pipe()
+        self._proc = multiprocessing.Process(target=self._enemies_over_time, args=(resx, resy), daemon=True)
+        self._proc.start()
+
+    def _enemies_over_time(self) -> None:
+        """
+        Callback passed to a subprocess (multiprocessing.Process) as the target to periodically generate attributes
+        to construct enemies with. This function doesn't know anything about the world, it simply generates enemy
+        attributes based on its current settings
+        :param resx: Integer representing X resolution. Enemies will spawn within 0 and resx.
+        :param resy: Integer representing Y resolution. Enemies will spawn within 0 and resy.
+        :return: None, enemy attributes are sent through self._game.send() for interprocess communication.
+        """
+        while True:
+            posx = random.randint(0, self._settings["res_x"])
+            posy = random.randint(0, self._settings["res_y"])
+            vel_max = self._settings["vel_max"]
+            velx = random.randint(-vel_max, vel_max)
+            vely = random.randint(-vel_max, vel_max)
+            time.sleep(self._settings["sleep"])
+            scale = random.uniform(self._settings["scale_min"], self._settings["scale_max"])
+
+            self._game.send((posx, posy, velx, vely, scale))
+
+            print(f'generated enemy attributes\nvel: {velx},{vely}\nscale:{scale}')
+
+            if self._settings["enabled"]:
+                if self._game.poll():
+                    self._settings.update(self._game.recv())
+
+    def update_settings(self, settings: dict) -> None:
+        """
+        Change the parameters by which self._enemies_over_time() creates enemy attributes
+        Any keys in @settings that already have a value in _enemies_over_time will override
+        :param settings: a dictionary of settings and values, see _enemies_over_time for valid values
+        :return: None
+        """
+        self._enemies.send(settings)
+
+    def enemies_remain(self) -> bool:
+        return self._enemies.poll()
+
+    def next_enemy(self) -> tuple:
+        return self._enemies.recv()
+
+    def pause(self):
+        self._enemies.send({"enabled": False})
+
+    def resume(self):
+        self._enemies.send({"enabled": True})
+
+
 class Game:
     def __init__(self, enemies_per_sec=2, max_enemies=5, fps=60, res=(720, 480)):
         self.eps = enemies_per_sec
@@ -11,7 +78,7 @@ class Game:
         self.res = res
         self.world = esper.World()
         self.window = pygame.display.set_mode(self.res)
-        self._enemy_spawn_proc = None
+        self.spawn = EnemySpawn(res[0], res[1])
         self.max_enemies = max_enemies
 
     def _add_player(self) -> int:
@@ -30,46 +97,6 @@ class Game:
         self.world.add_processor(MovementProcessor(minx=0, maxx=self.res[0], miny=0, maxy=self.res[1]))
         self.world.add_processor(CollisionProcessor())
 
-    def _init_enemy_spawn(self):
-        """
-        Initialize enemy spawning process
-        :return: multiprocess.Pipe that integers representing enemy Entities can be .recv()'d
-            from and settings .send()'t to
-        """
-        # todo enemy locations based on player location
-        # todo spawn frequency based on enemies on map
-        # todo velocity based on Difficulty
-
-        game, enemies = multiprocessing.Pipe()
-
-        def enemies_over_time(game_conn) -> None:
-            settings = {
-                "vel_max": 3,
-                "sleep": 2,
-                "scale_min": 1.0,
-                "scale_max": 1.0,
-            }
-            while True:
-                posx = random.randint(0, self.res[0])
-                posy = random.randint(0, self.res[1])
-                vel_max = settings["vel_max"]
-                velx = random.randint(-vel_max, vel_max)
-                vely = random.randint(-vel_max, vel_max)
-                time.sleep(settings["sleep"])
-                scale = random.uniform(settings["scale_min"], settings["scale_max"])
-
-                game_conn.send((posx, posy, velx, vely, scale))
-
-                print(f'generated enemy with attributes\nvel: {velx},{vely}\nscale:{scale}')
-
-                if game_conn.poll():
-                    settings.update(game_conn.recv())
-
-        self._enemy_spawn_proc = multiprocessing.Process(target=enemies_over_time, args=(game,), daemon=True)
-        self._enemy_spawn_proc.start()
-
-        return enemies
-
     def start(self):
         pygame.init()
         pygame.display.set_caption("Henlo")
@@ -78,8 +105,6 @@ class Game:
 
         player = self._add_player()
         self._load_processors()
-
-        enemy_conn = self._init_enemy_spawn()
 
         running = True
         while running:
@@ -105,12 +130,11 @@ class Game:
 
             self.world.process()
             clock.tick(self.fps)
-            if enemy_conn.poll():
-                if not len(self.world._entities) >= self.max_enemies:
-                    self._add_enemy(*enemy_conn.recv())
-
-                    # conditional enemy spawning based on game state
-                    if len(self.world._entities) >= 2:
-                        enemy_conn.send({"scale_min": 0.5, "scale_max": 0.5, "sleep": 1, "vel_max": 1})
+            if not len(self.world._entities) >= self.max_enemies:
+                if self.spawn.enemies_remain():
+                    self._add_enemy(*self.spawn.next_enemy())
+                # conditional enemy spawning based on game state
+                if len(self.world._entities) >= 2:
+                    self.spawn.update_settings({"scale_min": 0.5, "scale_max": 0.5, "sleep": 1, "vel_max": 1})
 
 # todo fix enemy spawn process not exiting on game exit with Escape
