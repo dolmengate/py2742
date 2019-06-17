@@ -40,7 +40,7 @@ class Game:
         # todo spawn frequency based on enemies on map
         # todo velocity based on Difficulty
 
-        into, outof = multiprocessing.Pipe()
+        game, enemies = multiprocessing.Pipe()
 
         def enemies_over_time(game_conn) -> None:
             settings = {
@@ -65,10 +65,10 @@ class Game:
                 if game_conn.poll():
                     settings.update(game_conn.recv())
 
-        self._enemy_spawn_proc = multiprocessing.Process(target=enemies_over_time, args=(into,), daemon=True)
+        self._enemy_spawn_proc = multiprocessing.Process(target=enemies_over_time, args=(game,), daemon=True)
         self._enemy_spawn_proc.start()
 
-        return outof
+        return enemies
 
     def start(self):
         pygame.init()

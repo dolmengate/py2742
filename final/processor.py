@@ -7,6 +7,7 @@ import itertools
 
 class CollisionProcessor(esper.Processor):
     def __init__(self):
+        super().__init__()
         pass
 
     def process(self):
@@ -36,6 +37,13 @@ class MovementProcessor(esper.Processor):
             rend.rect.y = max(self.miny, rend.rect.y)
             rend.rect.x = min(self.maxx - rend.w, rend.rect.x)
             rend.rect.y = min(self.maxy - rend.h, rend.rect.y)
+
+            if ent != 1:
+                # bounce enemies off of the screen boundaries
+                if rend.rect.left == self.minx or rend.rect.right == self.maxx:
+                    vel.x = -vel.x
+                if rend.rect.bottom == self.maxy or rend.rect.top == self.miny:
+                    vel.y = -vel.y
 
 
 class RenderProcessor(esper.Processor):
