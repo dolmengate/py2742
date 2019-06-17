@@ -1,6 +1,7 @@
 import multiprocessing
 import random
 from processor import *
+from os.path import join
 
 
 class Game:
@@ -16,13 +17,13 @@ class Game:
     def _add_player(self) -> int:
         player = self.world.create_entity()
         self.world.add_component(player, Velocity(x=0, y=0))
-        self.world.add_component(player, Renderable("redsquare.png", posx=100, posy=100))
+        self.world.add_component(player, Renderable(join("images", "honkler_ss.png"), posx=100, posy=100))
         return player
 
     def _add_enemy(self, x: int, y: int, velx: int, vely: int, scale=None) -> None:
         enemy = self.world.create_entity()
         self.world.add_component(enemy, Velocity(x=velx, y=vely))
-        self.world.add_component(enemy, Renderable("bluesquare.png", posx=x, posy=y, scale=scale))
+        self.world.add_component(enemy, Renderable(join("images", "nose.png"), posx=x, posy=y, scale=scale))
 
     def _load_processors(self):
         self.world.add_processor(RenderProcessor(window=self.window))
@@ -111,9 +112,5 @@ class Game:
                     # conditional enemy spawning based on game state
                     if len(self.world._entities) >= 2:
                         enemy_conn.send({"scale_min": 0.5, "scale_max": 0.5, "sleep": 1, "vel_max": 1})
-
-
-
-
 
 # todo fix enemy spawn process not exiting on game exit with Escape
