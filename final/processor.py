@@ -3,6 +3,7 @@ import esper
 from component import *
 import pygame
 import itertools
+from math import hypot
 
 
 class CollisionProcessor(esper.Processor):
@@ -45,6 +46,13 @@ class MovementProcessor(esper.Processor):
                     vel.x = -vel.x
                 if rend.rect.bottom == self.maxy or rend.rect.top == self.miny:
                     vel.y = -vel.y
+
+                # run away bruh
+                enemy_entities = (e[1][0] for e in self.world.get_components(Renderable) if e[0] != ent)
+                closest = sorted(enemy_entities,
+                                 key=lambda c: hypot(c.rect.x - rend.rect.x, c.rect.y - rend.rect.y)
+                                 )[0]
+                print(f'{closest.rect.x}, {closest.rect.y}')
 
 
 class RenderProcessor(esper.Processor):

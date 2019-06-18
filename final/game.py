@@ -20,7 +20,7 @@ class EnemySpawn:
             "enabled": True,
         }
         self._game, self._enemies = multiprocessing.Pipe()
-        self._proc = multiprocessing.Process(target=self._enemies_over_time, args=(resx, resy), daemon=True)
+        self._proc = multiprocessing.Process(target=self._enemies_over_time, daemon=True)
         self._proc.start()
 
     def _enemies_over_time(self) -> None:
@@ -28,8 +28,6 @@ class EnemySpawn:
         Callback passed to a subprocess (multiprocessing.Process) as the target to periodically generate attributes
         to construct enemies with. This function doesn't know anything about the world, it simply generates enemy
         attributes based on its current settings
-        :param resx: Integer representing X resolution. Enemies will spawn within 0 and resx.
-        :param resy: Integer representing Y resolution. Enemies will spawn within 0 and resy.
         :return: None, enemy attributes are sent through self._game.send() for interprocess communication.
         """
         while True:
@@ -41,13 +39,13 @@ class EnemySpawn:
             time.sleep(self._settings["sleep"])
             scale = random.uniform(self._settings["scale_min"], self._settings["scale_max"])
 
-            self._game.send((posx, posy, velx, vely, scale))
+            if self._settings["enabled"]:
+                self._game.send((posx, posy, velx, vely, scale))
 
             print(f'generated enemy attributes\nvel: {velx},{vely}\nscale:{scale}')
 
-            if self._settings["enabled"]:
-                if self._game.poll():
-                    self._settings.update(self._game.recv())
+            if self._game.poll():
+                self._settings.update(self._game.recv())
 
     def update_settings(self, settings: dict) -> None:
         """
@@ -72,7 +70,8 @@ class EnemySpawn:
 
 
 class Game:
-    def __init__(self, enemies_per_sec=2, max_enemies=5, fps=60, res=(720, 480)):
+    def __init__(self, enemies_per_sec=2, max_enemies=2, fps=60, res=(720, 480)):
+        # todo move max enemies to EnemySpawn setting
         self.eps = enemies_per_sec
         self.fps = fps
         self.res = res
