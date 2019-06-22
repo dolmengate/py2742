@@ -6,12 +6,16 @@ from sys import exit
 
 
 class EnemySpawn:
-    def __init__(self, resx, resy):
+    def __init__(self, game, max_enemies, resx, resy):
         # todo enemy locations based on player location
         # todo spawn frequency based on enemies on map
         # todo velocity based on Difficulty
+        # todo alter entity speed based on size
 
+        self.world = game.world
+        self.game = game
         self._settings = {
+            "max_enemies": max_enemies,
             "res_x": resx,
             "res_y": resy,
             "vel_max": 2,
@@ -48,7 +52,17 @@ class EnemySpawn:
             if self._game.poll():
                 self._settings.update(self._game.recv())
 
-    def update_settings(self, settings: dict) -> None:
+    def process(self):
+        if not len(self.world._entities) >= self._settings["max_enemies"]:
+            # add next enemy
+            if self.enemies_in_queue():
+                self.game.add_enemy(*self.next_enemy())
+
+        # update difficulty
+        # if len(self.world._entities) >= 2:
+        #     self.spawn.update_settings({"scale_min": 0.5, "scale_max": 0.5, "sleep": 1, "vel_max": 1})
+
+    def _update_settings(self, settings: dict) -> None:
         """
         Change the parameters by which self._enemies_over_time() creates enemy attributes
         Any keys in @settings that already have a value in _enemies_over_time will override
@@ -57,7 +71,7 @@ class EnemySpawn:
         """
         self._enemies.send(settings)
 
-    def enemies_remain(self) -> bool:
+    def enemies_in_queue(self) -> bool:
         return self._enemies.poll()
 
     def next_enemy(self) -> tuple:
@@ -73,15 +87,14 @@ class EnemySpawn:
 
 
 class Game:
-    def __init__(self, enemies_per_sec=2, max_enemies=6, fps=60, res=(1080, 720)):
-        # todo move max enemies to EnemySpawn setting
+    # todo eps doesn't do anything
+    def __init__(self, enemies_per_sec=5, max_enemies=99, fps=60, res=(1080, 720)):
         self.eps = enemies_per_sec
         self.fps = fps
         self.res = res
         self.world = esper.World()
         self.window = pygame.display.set_mode(self.res)
-        self.spawn = EnemySpawn(res[0], res[1])
-        self.max_enemies = max_enemies
+        self.spawn = EnemySpawn(self, max_enemies, res[0], res[1])
 
     def _add_player(self) -> int:
         player = self.world.create_entity()
@@ -90,7 +103,7 @@ class Game:
         self.world.add_component(player, Consumer(g_rate=0.05))
         return player
 
-    def _add_enemy(self, x: int, y: int, velx: int, vely: int, scale=1) -> None:
+    def add_enemy(self, x: int, y: int, velx: int, vely: int, scale=1) -> None:
         enemy = self.world.create_entity()
         self.world.add_component(enemy, Velocity(x=velx, y=vely))
         self.world.add_component(enemy, Renderable(join("images", "nose.png"), posx=x, posy=y, scale=scale))
@@ -142,14 +155,8 @@ class Game:
                         self.world.component_for_entity(player, Velocity).y = 0
 
             self.world.process()
+            self.spawn.process()
             clock.tick(self.fps)
-            if not len(self.world._entities) >= self.max_enemies:
-                if self.spawn.enemies_remain():
-                    self._add_enemy(*self.spawn.next_enemy())
-                # conditional enemy spawning based on game state
-                # if len(self.world._entities) >= 2:
-                #     self.spawn.update_settings({"scale_min": 0.5, "scale_max": 0.5, "sleep": 1, "vel_max": 1})
-
         self.spawn.pause()
         exit(0)
 
