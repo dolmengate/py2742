@@ -43,7 +43,7 @@ class EnemySpawn:
             if self._settings["enabled"]:
                 self._game.send((posx, posy, velx, vely, scale))
 
-            print(f'generated enemy attributes\nvel: {velx},{vely}\nscale:{scale}')
+            # print(f'generated enemy attributes\nvel: {velx},{vely}\nscale:{scale}')
 
             if self._game.poll():
                 self._settings.update(self._game.recv())
@@ -86,11 +86,11 @@ class Game:
     def _add_player(self) -> int:
         player = self.world.create_entity()
         self.world.add_component(player, Velocity(x=0, y=0))
-        self.world.add_component(player, Renderable(join("images", "honkler_ss.png"), posx=100, posy=100))
+        self.world.add_component(player, Renderable(join("images", "honkler_ss.png"), posx=100, posy=100, scale=0.5))
         self.world.add_component(player, Consumer(g_rate=0.05))
         return player
 
-    def _add_enemy(self, x: int, y: int, velx: int, vely: int, scale=None) -> None:
+    def _add_enemy(self, x: int, y: int, velx: int, vely: int, scale=1) -> None:
         enemy = self.world.create_entity()
         self.world.add_component(enemy, Velocity(x=velx, y=vely))
         self.world.add_component(enemy, Renderable(join("images", "nose.png"), posx=x, posy=y, scale=scale))
@@ -103,7 +103,7 @@ class Game:
 
     def _game_over(self) -> bool:
         try:
-            self.world.component_for_entity(1, Renderable)
+            self.world.component_for_entity(1, Velocity)
         except KeyError:
             return True
         return False
@@ -120,7 +120,7 @@ class Game:
         running = True
         while running:
             if self._game_over():
-                running = False
+                break
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
