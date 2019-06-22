@@ -13,10 +13,10 @@ class EnemySpawn:
         self._settings = {
             "res_x": resx,
             "res_y": resy,
-            "vel_max": 3,
-            "sleep": 2,
-            "scale_min": 1.0,
-            "scale_max": 1.0,
+            "vel_max": 2,
+            "sleep": 0.2,
+            "scale_min": 0.2,
+            "scale_max": 0.5,
             "enabled": True,
         }
         self._game, self._enemies = multiprocessing.Pipe()
@@ -42,7 +42,7 @@ class EnemySpawn:
             if self._settings["enabled"]:
                 self._game.send((posx, posy, velx, vely, scale))
 
-            print(f'generated enemy attributes\nvel: {velx},{vely}\nscale:{scale}')
+            # print(f'generated enemy attributes\nvel: {velx},{vely}\nscale:{scale}')
 
             if self._game.poll():
                 self._settings.update(self._game.recv())
@@ -70,7 +70,7 @@ class EnemySpawn:
 
 
 class Game:
-    def __init__(self, enemies_per_sec=2, max_enemies=2, fps=60, res=(720, 480)):
+    def __init__(self, enemies_per_sec=2, max_enemies=6, fps=60, res=(720, 480)):
         # todo move max enemies to EnemySpawn setting
         self.eps = enemies_per_sec
         self.fps = fps
@@ -84,12 +84,14 @@ class Game:
         player = self.world.create_entity()
         self.world.add_component(player, Velocity(x=0, y=0))
         self.world.add_component(player, Renderable(join("images", "honkler_ss.png"), posx=100, posy=100))
+        self.world.add_component(player, Consumer(g_rate=0.05))
         return player
 
     def _add_enemy(self, x: int, y: int, velx: int, vely: int, scale=None) -> None:
         enemy = self.world.create_entity()
         self.world.add_component(enemy, Velocity(x=velx, y=vely))
         self.world.add_component(enemy, Renderable(join("images", "nose.png"), posx=x, posy=y, scale=scale))
+        self.world.add_component(enemy, Consumer(g_rate=0.1))
 
     def _load_processors(self):
         self.world.add_processor(RenderProcessor(window=self.window))
@@ -133,7 +135,7 @@ class Game:
                 if self.spawn.enemies_remain():
                     self._add_enemy(*self.spawn.next_enemy())
                 # conditional enemy spawning based on game state
-                if len(self.world._entities) >= 2:
-                    self.spawn.update_settings({"scale_min": 0.5, "scale_max": 0.5, "sleep": 1, "vel_max": 1})
+                # if len(self.world._entities) >= 2:
+                #     self.spawn.update_settings({"scale_min": 0.5, "scale_max": 0.5, "sleep": 1, "vel_max": 1})
 
 # todo fix enemy spawn process not exiting on game exit with Escape
