@@ -2,6 +2,7 @@ import multiprocessing
 import random
 from processor import *
 from os.path import join
+from sys import exit
 
 
 class EnemySpawn:
@@ -30,7 +31,7 @@ class EnemySpawn:
         attributes based on its current settings
         :return: None, enemy attributes are sent through self._game.send() for interprocess communication.
         """
-        while True:
+        while self._settings["enabled"]:
             posx = random.randint(0, self._settings["res_x"])
             posy = random.randint(0, self._settings["res_y"])
             vel_max = self._settings["vel_max"]
@@ -42,7 +43,7 @@ class EnemySpawn:
             if self._settings["enabled"]:
                 self._game.send((posx, posy, velx, vely, scale))
 
-            # print(f'generated enemy attributes\nvel: {velx},{vely}\nscale:{scale}')
+            print(f'generated enemy attributes\nvel: {velx},{vely}\nscale:{scale}')
 
             if self._game.poll():
                 self._settings.update(self._game.recv())
@@ -64,13 +65,15 @@ class EnemySpawn:
 
     def pause(self):
         self._enemies.send({"enabled": False})
+        return self
 
     def resume(self):
         self._enemies.send({"enabled": True})
+        return self
 
 
 class Game:
-    def __init__(self, enemies_per_sec=2, max_enemies=6, fps=60, res=(720, 480)):
+    def __init__(self, enemies_per_sec=2, max_enemies=6, fps=60, res=(1080, 720)):
         # todo move max enemies to EnemySpawn setting
         self.eps = enemies_per_sec
         self.fps = fps
@@ -98,6 +101,13 @@ class Game:
         self.world.add_processor(MovementProcessor(minx=0, maxx=self.res[0], miny=0, maxy=self.res[1]))
         self.world.add_processor(CollisionProcessor())
 
+    def _game_over(self) -> bool:
+        try:
+            self.world.component_for_entity(1, Renderable)
+        except KeyError:
+            return True
+        return False
+
     def start(self):
         pygame.init()
         pygame.display.set_caption("Henlo")
@@ -109,6 +119,8 @@ class Game:
 
         running = True
         while running:
+            if self._game_over():
+                running = False
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -137,5 +149,8 @@ class Game:
                 # conditional enemy spawning based on game state
                 # if len(self.world._entities) >= 2:
                 #     self.spawn.update_settings({"scale_min": 0.5, "scale_max": 0.5, "sleep": 1, "vel_max": 1})
+
+        self.spawn.pause()
+        exit(0)
 
 # todo fix enemy spawn process not exiting on game exit with Escape

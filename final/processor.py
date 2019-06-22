@@ -66,18 +66,20 @@ class MovementProcessor(esper.Processor):
 
                 # run away bruh
                 enemy_entities = (e[1][0] for e in self.world.get_components(Renderable) if e[0] != ent)
-                closest = sorted(enemy_entities,
+                enemies = sorted(enemy_entities,
                                  key=lambda c: hypot(c.rect.x - rend.rect.x, c.rect.y - rend.rect.y)
-                                 )[0]
-                # print(f'{closest.rect.x}, {closest.rect.y}')
-                if closest.rect.x < rend.rect.x:
-                    vel.x = -2.9
-                elif closest.rect.x > rend.rect.x:
-                    vel.x = 2.9
-                if closest.rect.y < rend.rect.y:
-                    vel.y = -2.9
-                elif closest.rect.y > rend.rect.y:
-                    vel.y = 2.9
+                                 )
+                if enemies:
+                    closest = enemies[0]
+                    # print(f'{closest.rect.x}, {closest.rect.y}')
+                    if closest.rect.x < rend.rect.x:
+                        vel.x = -2.9
+                    elif closest.rect.x > rend.rect.x:
+                        vel.x = 2.9
+                    if closest.rect.y < rend.rect.y:
+                        vel.y = -2.9
+                    elif closest.rect.y > rend.rect.y:
+                        vel.y = 2.9
 
 
 class RenderProcessor(esper.Processor):
