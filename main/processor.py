@@ -1,14 +1,16 @@
 import time
 from typing import Tuple
 
-import esper
-from component import *
+from .esper import Processor
+from .component import *
 import pygame
 import itertools
 from math import hypot
 
+from main.component import Renderable, Consumer
 
-class CollisionProcessor(esper.Processor):
+
+class CollisionProcessor(Processor):
     def __init__(self):
         super().__init__()
 
@@ -37,7 +39,7 @@ class CollisionProcessor(esper.Processor):
                 self._collide((a[0], a_rend, a_cons), (b[0], b_rend, b_cons))
 
 
-class MovementProcessor(esper.Processor):
+class MovementProcessor(Processor):
     def __init__(self, minx, maxx, miny, maxy):
         super().__init__()
         self.screen_min_x = minx
@@ -77,7 +79,7 @@ class MovementProcessor(esper.Processor):
                         vel.y = 2.9
 
 
-class RenderProcessor(esper.Processor):
+class RenderProcessor(Processor):
     def __init__(self, window, clear_color=(20, 20, 20)):
         super().__init__()
         self.window = window

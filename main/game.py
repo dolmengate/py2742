@@ -1,19 +1,14 @@
 import multiprocessing
 import random
-from processor import *
+
+from main import esper
+from .processor import *
 from os.path import join
 from sys import exit
 
 
-class EnemySpawn:
-    def __init__(self, game, max_enemies, resx, resy):
-        # todo enemy locations based on player location
-        # todo spawn frequency based on enemies on map
-        # todo velocity based on Difficulty
-        # todo alter entity speed based on size
-
-        self.world = game.world
-        self.game = game
+class SpawnProcess:
+    def __init__(self, max_enemies, resx, resy, pipe_game_side):
         self._settings = {
             "max_enemies": max_enemies,
             "res_x": resx,
@@ -24,8 +19,8 @@ class EnemySpawn:
             "scale_max": 0.5,
             "enabled": True,
         }
-        self._game, self._enemies = multiprocessing.Pipe()
-        self._proc = multiprocessing.Process(target=self._enemies_over_time, daemon=True)
+        self._pipe_game_side = pipe_game_side
+        self._proc = multiprocessing.Process(target=self._enemies_over_time)
         self._proc.start()
 
     def _enemies_over_time(self) -> None:
@@ -44,16 +39,34 @@ class EnemySpawn:
             time.sleep(self._settings["sleep"])
             scale = random.uniform(self._settings["scale_min"], self._settings["scale_max"])
 
+            # send enemies to pipe
             if self._settings["enabled"]:
-                self._game.send((posx, posy, velx, vely, scale))
+                self._pipe_game_side.send((posx, posy, velx, vely, scale))
 
             # print(f'generated enemy attributes\nvel: {velx},{vely}\nscale:{scale}')
 
-            if self._game.poll():
-                self._settings.update(self._game.recv())
+            # apply pending updates from the other side of the pipe
+            if self._pipe_game_side.poll():
+                self._settings.update(self._pipe_game_side.recv())
+
+    def get_max_enemies(self) -> int:
+        return self._settings['max_enemies']
+
+
+class SpawnController:
+    def __init__(self, game, max_enemies, resx, resy):
+        # todo enemy locations based on player location
+        # todo spawn frequency based on enemies on map
+        # todo velocity based on Difficulty
+        # todo alter entity speed based on size
+
+        self.world = game.world
+        self.game = game
+        self._game, self._enemies = multiprocessing.Pipe()
+        self._process = SpawnProcess(max_enemies, resx, resy, self._game)
 
     def process(self):
-        if not len(self.world._entities) >= self._settings["max_enemies"]:
+        if not len(self.world._entities) >= self._process.get_max_enemies():
             # add next enemy
             if self.enemies_in_queue():
                 self.game.add_enemy(*self.next_enemy())
@@ -94,7 +107,7 @@ class Game:
         self.res = res
         self.world = esper.World()
         self.window = pygame.display.set_mode(self.res)
-        self.spawn = EnemySpawn(self, max_enemies, res[0], res[1])
+        self.spawn = SpawnController(self, max_enemies, res[0], res[1])
 
     def _add_player(self) -> int:
         player = self.world.create_entity()

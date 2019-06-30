@@ -1,5 +1,4 @@
-from pygame import sprite, image, transform
-from pygame.surface import Surface
+from pygame import sprite, image, transform, Surface
 
 
 class Velocity:
