@@ -7,21 +7,25 @@ import pygame
 import itertools
 from math import hypot
 
-from main.component import Renderable, Consumer
+from main.component import RenderableActor, Consumer
 
 
 class CollisionProcessor(Processor):
     def __init__(self):
         super().__init__()
 
-    def _collide(self, comps1: Tuple[int, Renderable, Consumer], comps2: Tuple[int, Renderable, Consumer]):
-        def consume_enemy(consumer: Tuple[int, Renderable, Consumer], consumed: Tuple[int, Renderable, Consumer]):
-            entity1 = consumer[0]
-            entity2 = consumed[0]
-            rend1, rend2 = consumer[1], consumed[1]
-            cons1, cons2 = consumer[2], consumed[2]
-            self.world.delete_entity(entity2)
-            rend1.increment_size(1)
+    def _collide(self, comps1: Tuple[int, RenderableActor, Consumer, ScoreValue],
+                 comps2: Tuple[int, RenderableActor, Consumer, ScoreValue]):
+        def consume_enemy(consumer: Tuple[int, RenderableActor, Consumer, ScoreValue],
+                          consumed: Tuple[int, RenderableActor, Consumer, ScoreValue]):
+            consumed_entity = consumed[0]
+            consumer_rend, consumed_rend = consumer[1], consumed[1]
+            consumer_value = consumer[3]
+            consumed_value = consumed[3].points
+
+            self.world.delete_entity(consumed_entity)
+            consumer_value.increment(consumed_value)
+            consumer_rend.increment_size(1)
 
         rend1, rend2 = comps1[1], comps2[1]
         if rend1.is_bigger_than(rend2):
@@ -31,12 +35,13 @@ class CollisionProcessor(Processor):
 
     def process(self):
         # Sprite Groups instead?
-        for a, b in itertools.product(self.world.get_components(Renderable, Consumer), repeat=2):
-            # get Renderables and Consumers
+        for a, b in itertools.product(self.world.get_components(RenderableActor, Consumer, ScoreValue), repeat=2):
+            # get Renderables, Consumers and ScoreValues
             a_rend, b_rend = a[1][0], b[1][0]
             a_cons, b_cons = a[1][1], b[1][1]
+            a_scor, b_scor = a[1][2], b[1][2]
             if a_rend != b_rend and pygame.sprite.collide_rect(a_rend, b_rend):
-                self._collide((a[0], a_rend, a_cons), (b[0], b_rend, b_cons))
+                self._collide((a[0], a_rend, a_cons, a_scor), (b[0], b_rend, b_cons, b_scor))
 
 
 class MovementProcessor(Processor):
@@ -48,7 +53,7 @@ class MovementProcessor(Processor):
         self.screen_max_y = maxy
 
     def process(self):
-        for ent, (vel, rend) in self.world.get_components(Velocity, Renderable):
+        for ent, (vel, rend) in self.world.get_components(Velocity, RenderableActor):
             rend.x += vel.x
             rend.y += vel.y
 
@@ -62,7 +67,7 @@ class MovementProcessor(Processor):
             if ent != 1:
 
                 # run away bruh
-                enemy_entities = (e[1][0] for e in self.world.get_components(Renderable) if e[0] != ent)
+                enemy_entities = (e[1][0] for e in self.world.get_components(RenderableActor) if e[0] != ent)
                 enemies = sorted(enemy_entities,
                                  key=lambda c: hypot(c.x - rend.x, c.y - rend.y)
                                  )
@@ -84,12 +89,24 @@ class RenderProcessor(Processor):
         super().__init__()
         self.window = window
         self.clear_color = clear_color
+        self._menu_font = pygame.font.SysFont('default', 20)
 
     def process(self):
-        # Clear the window:
         self.window.fill(self.clear_color)
-        # This will iterate over every Entity that has this Component, and blit it:
-        for ent, rend in self.world.get_component(Renderable):
+
+        # render player and enemies
+        for ent, rend in self.world.get_component(RenderableActor):
             self.window.blit(rend.image, (rend.x, rend.y))
+
+        # render menus
+        for ent, rend in self.world.get_component(MenuItem):
+            if rend.name is "score":
+                try:
+                    player_score = self.world.component_for_entity(1, ScoreValue).points
+                except KeyError:
+                    break
+                rend.image = self._menu_font.render(f'Score: {player_score}', False, (255, 255, 255))
+            self.window.blit(rend.image, (rend.x, rend.y))
+
         # Flip the framebuffers
         pygame.display.flip()

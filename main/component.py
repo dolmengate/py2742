@@ -7,17 +7,21 @@ class Velocity:
         self.y = y
 
 
-class Renderable(sprite.Sprite):
-    def __init__(self, image_loc, posx, posy, scale: float = 1, *groups):
-        super().__init__(*groups)
-        # self.image = image.load(image_loc)  # surface
-        self.image = Surface((20, 20))
-        self.image.fill((255, 255, 0))
-        self.rescale(scale)
+class ScoreValue:
+    def __init__(self):
+        self.points = 1
+
+    def increment(self, value: int):
+        self.points += value
+
+
+class Renderable:
+    def __init__(self, siz, posx, posy, color):
+        self.image = Surface(siz)
+        self.image.fill(color)
         self.rect = self.image.get_rect()
         self.rect.x = posx
         self.rect.y = posy
-        self.toggle = True
 
     @property
     def x(self):
@@ -42,6 +46,19 @@ class Renderable(sprite.Sprite):
     @property
     def h(self):
         return self.rect.bottom - self.rect.top
+
+
+class MenuItem(Renderable):
+    def __init__(self, name, siz, posx, posy):
+        Renderable.__init__(self, siz, posx, posy, (255, 255, 255))
+        self.name = name
+
+
+class RenderableActor(Renderable, sprite.Sprite):
+    def __init__(self, posx, posy, scale: float = 1, color=(255, 255, 0), *groups):
+        sprite.Sprite.__init__(self, *groups)
+        Renderable.__init__(self, (20, 20), posx, posy, color)
+        self.rescale(scale)
 
     def rescale(self, scale):
         increment = self.image.get_width() * scale
